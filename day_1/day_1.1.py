@@ -1,5 +1,3 @@
-import sys
-
 """
 多行注释
 """
@@ -12,7 +10,7 @@ print(str[0:-1])
 print(str[0])
 print(str[2:5])
 print(str[2:])
-print(str[1:5:2])  # 从第2个到第6个且步长为2
+print(str[1:5:2])  # 从第2个到第5个且步长为2
 print(str * 2)
 print(str + 'Hello')
 print('------------------------------')
