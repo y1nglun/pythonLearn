@@ -1,36 +1,23 @@
-import os
+from urllib.request import HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, build_opener, ProxyHandler
+from urllib.error import URLError
 
-import requests
-from bs4 import BeautifulSoup
+username = "admin"
+password = "admin"
+url = "https://ssr3.scrape.center/"
 
-movie_list = []
-save_path = "豆瓣电影"
-path = save_path + "/" + "TOP250.txt"
+# proxy_handler = ProxyHandler({
+#     "http": "http://127.0.0.1:8080",
+#     "https": "https://127.0.0.1:8080"
+# })
 
-for page in range(0, 250, 25):
+p = HTTPPasswordMgrWithDefaultRealm()
+p.add_password(None, url, username, password)
+auth_handler = HTTPBasicAuthHandler(p)
+opener = build_opener(auth_handler)
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/111.0.0.0 Safari/537.36"
-    }
-    response = requests.get(f"https://movie.douban.com/top250?start={page}", headers=headers)
-    if response.ok:
-        content = response.text
-    else:
-        print(response.status_code)
-
-    soup = BeautifulSoup(content, "html.parser")
-    all_title = soup.findAll("span", attrs="title")
-    for title in all_title:
-        title_string = title.string
-        if '/' not in title_string:
-            print(title_string)
-            movie_list.append(title_string)
-
-print(movie_list)
-
-if not os.path.exists(save_path):
-    os.mkdir(save_path)
-with open(path, "w+", encoding="utf-8") as fp:
-    for i in movie_list:
-        fp.write(str(i) + '\n')
+try:
+    result = opener.open(url)
+    html = result.read().decode("UTF-8")
+    print(html)
+except URLError as e:
+    print(e.reason)
