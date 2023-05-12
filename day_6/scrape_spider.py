@@ -1,6 +1,10 @@
 import requests
 import logging
 import re
+import multiprocessing
+from os import makedirs
+from os.path import exists
+import json
 from urllib.parse import urljoin
 
 logging.basicConfig(level=logging.INFO,
@@ -8,6 +12,8 @@ logging.basicConfig(level=logging.INFO,
 
 BASE_URL = 'https://ssr1.scrape.center'
 TOTAL_PAGE = 10
+RESULTS_DIR = 'results'
+exists(RESULTS_DIR) or makedirs(RESULTS_DIR)
 
 
 def scrape_page(url):
@@ -28,6 +34,7 @@ def scrape_index(page):
 
 def parse_index(html):
     pattern = re.compile('<a.*?href="(.*?)".*?class="name">')
+
     items = re.findall(pattern, html)
     if not items:
         logging.info('no items')
@@ -38,12 +45,54 @@ def parse_index(html):
         yield detail_url
 
 
-def main():
-    for page in range(1, TOTAL_PAGE + 1):
-        index_html = scrape_index(page)
-        detail_urls = parse_index(index_html)
-        logging.info('detail urls %s', list(detail_urls))
+def scrape_detail(url):
+    return scrape_page(url)
+
+
+def parse_detail(html):
+    cover_pattern = re.compile('class="item.*?<img.*?src="(.*?)".*?class="cover">', re.S)
+    cover = re.search(cover_pattern, html).group(1).strip() if re.search(cover_pattern, html) else None
+    name_pattern = re.compile('<h2.*?class="m-b-sm">(.*?)</h2>', re.S)
+    name = re.search(name_pattern, html).group(1).strip() if re.search(name_pattern, html) else None
+    categories_pattern = re.compile('<button.*?category.*?<span>(.*?)</span>.*?</button>', re.S)
+    categories = re.findall(categories_pattern, html) if re.findall(categories_pattern, html) else []
+    published_at_pattern = re.compile('(\d{4}-\d{2}-\d{2})\s?上映')
+    published_at = re.search(published_at_pattern, html).group(1) if re.search(published_at_pattern,
+                                                                               html) else None
+    score_pattern = re.compile('<p.*?class="score.*?">(.*?)</p>', re.S)
+    score = re.search(score_pattern, html).group(1).strip() if re.search(score_pattern, html) else None
+
+    return {
+        'cover': cover,
+        'name': name,
+        'categories': categories,
+        'published_at': published_at,
+        'score': score
+    }
+
+
+def save_data(data):
+    name = data.get('name')
+    data_path = f'{RESULTS_DIR}/{name}.json'
+    json.dump(data, open(data_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+
+
+def go(page):
+    index_html = scrape_index(page)
+    detail_urls = parse_index(index_html)
+    for detail_url in detail_urls:
+        detail_html = scrape_detail(detail_url)
+        data = parse_detail(detail_html)
+        logging.info('get detail data %s', data)
+        logging.info('saving data to json data')
+        save_data(data)
+        logging.info('data saved successfully')
+    logging.info('detail urls %s', list(detail_urls))
 
 
 if __name__ == '__main__':
-    main()
+    pool = multiprocessing.Pool()
+    pages = range(1, TOTAL_PAGE + 1)
+    pool.map(go, pages)
+    pool.close()
+    pool.join()
